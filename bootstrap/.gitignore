@@ -1,0 +1,19 @@
+# Diretorio de trabalho do Terraform (providers baixados, cache de modulos)
+.terraform/
+.terraform.tfstate.lock.info
+
+# State local. Existe apenas entre o primeiro apply e a migracao para o S3;
+# depois disso deve ser apagado. Nunca commitar: pode conter dados sensiveis.
+*.tfstate
+*.tfstate.*
+
+# Arquivos de variaveis com valores reais
+*.tfvars
+!example.tfvars
+
+# Planos salvos (podem conter valores sensiveis em texto puro)
+*.tfplan
+
+# NOTA: .terraform.lock.hcl NAO entra aqui de proposito. Ele trava as versoes
+# exatas dos providers e DEVE ser commitado, para que sua maquina e o runner do
+# GitHub usem exatamente as mesmas.
