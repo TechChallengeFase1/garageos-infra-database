@@ -1,0 +1,24 @@
+# Diretorio de trabalho do Terraform
+.terraform/
+.terraform.tfstate.lock.info
+
+# State local. O state real vive no S3 (ver backend em versions.tf).
+# Critico neste repositorio: o state do RDS contem a senha do banco em texto
+# puro. Se um state local for gerado por engano - um init sem backend, uma
+# migracao interrompida, alguem do grupo rodando antes de configurar - ele NAO
+# pode entrar no historico do Git.
+*.tfstate
+*.tfstate.*
+
+# Valores reais de variaveis. Os *.tfvars de ambiente sao versionados de
+# proposito (nao contem segredo), por isso as excecoes abaixo.
+*.tfvars
+!homolog.tfvars
+!producao.tfvars
+
+# Planos salvos podem conter valores sensiveis em texto puro
+*.tfplan
+
+# NOTA: .terraform.lock.hcl NAO entra aqui. Ele trava as versoes exatas dos
+# providers e deve ser commitado, para que a sua maquina e o runner do GitHub
+# usem exatamente as mesmas.
