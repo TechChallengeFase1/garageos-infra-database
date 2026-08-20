@@ -49,16 +49,34 @@ data "aws_iam_policy_document" "github_actions_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # O `sub` do token tem o formato:
+    # O `sub` do token tem o formato classico:
     #   repo:<org>/<repo>:ref:refs/heads/<branch>
-    # O sufixo ":*" aceita qualquer branch/tag/PR do repo listado.
     #
-    # Se um dia quiser restringir producao a uma branch especifica, troque por:
-    #   "repo:<org>/<repo>:ref:refs/heads/main"
+    # MAS esta organizacao usa IDs imutaveis, entao o que o GitHub realmente
+    # emite e:
+    #   repo:<org>@<org_id>/<repo>@<repo_id>:ref:refs/heads/<branch>
+    #
+    # Confirmado via CloudTrail:
+    #   repo:TechChallengeFase1@267126556/garageos-infra-database@1330333756:ref:refs/heads/main
+    #
+    # Os IDs sao imutaveis de proposito: se o repo for renomeado e outra pessoa
+    # registrar o nome antigo, ela nao herda este acesso. Como cada repo tem um
+    # ID diferente, eles sao casados com curinga - os NOMES da org e do repo
+    # seguem explicitos. Nome de organizacao no GitHub nao pode conter "@",
+    # entao "<org>@*" so casa com "<org>@<digitos>".
+    #
+    # Os dois formatos ficam aceitos, para o caso de a configuracao de IDs
+    # imutaveis ser desligada na organizacao mais tarde.
+    #
+    # O sufixo ":*" aceita qualquer branch/tag/PR. Para restringir producao a
+    # uma branch, troque o final por ":ref:refs/heads/main".
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [for repo in var.github_repos : "repo:${var.github_org}/${repo}:*"]
+      values = concat(
+        [for repo in var.github_repos : "repo:${var.github_org}/${repo}:*"],
+        [for repo in var.github_repos : "repo:${var.github_org}@*/${repo}@*:*"],
+      )
     }
   }
 }
