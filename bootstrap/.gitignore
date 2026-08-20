@@ -2,11 +2,6 @@
 .terraform/
 .terraform.tfstate.lock.info
 
-# State local. Existe apenas entre o primeiro apply e a migracao para o S3;
-# depois disso deve ser apagado. Nunca commitar: pode conter dados sensiveis.
-*.tfstate
-*.tfstate.*
-
 # Arquivos de variaveis com valores reais
 *.tfvars
 !example.tfvars

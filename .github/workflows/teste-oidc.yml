@@ -1,0 +1,57 @@
+name: Teste OIDC
+
+# Workflow de diagnostico. Nao faz deploy, nao cria recurso, nao gasta nada.
+#
+# Existe para provar que o mecanismo de autenticacao funciona ANTES de qualquer
+# pipeline real depender dele. Depurar
+# "Not authorized to perform sts:AssumeRoleWithWebIdentity" aqui leva minutos;
+# depurar o mesmo erro no meio de um apply de EKS, que leva ~15 min por
+# tentativa, custa a tarde inteira.
+#
+# Como rodar: aba Actions > Teste OIDC > Run workflow.
+
+on:
+  workflow_dispatch:
+
+# `id-token: write` e o que autoriza o GitHub a EMITIR o token OIDC desta
+# execucao. Sem esta linha o token nem chega a existir, e a mensagem de erro
+# que aparece nao menciona permissao nenhuma - por isso e a causa mais dificil
+# de achar quando se esquece.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  oidc:
+    name: Assumir a role e conferir os acessos
+    runs-on: ubuntu-latest
+
+    steps:
+      # O ARN abaixo NAO e um segredo: ele e inutil para quem nao esteja
+      # rodando dentro de um dos 4 repositorios nomeados na trust policy.
+      # Se preferir esconder o numero da conta, mova para uma repository
+      # variable e troque por ${{ vars.AWS_ROLE_ARN }}.
+      - name: Autenticar na AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::266380777968:role/garageos-github-actions
+          role-session-name: teste-oidc-${{ github.run_id }}
+          aws-region: us-east-1
+
+      # Nivel 1 - a role foi assumida?
+      # Espera-se um ARN de assumed-role, NAO de user.
+      - name: Quem sou eu na AWS
+        run: aws sts get-caller-identity
+
+      # Nivel 2 - a role consegue ler o bucket de state?
+      # E disso que todo `terraform init` vai depender.
+      - name: Ler o bucket de state
+        run: aws s3 ls s3://garageos-tfstate-266380777968/
+
+      # Nivel 3 - a role consegue ler o quadro de avisos entre os repos?
+      # E daqui que infra-k8s e lambda-auth vao descobrir a VPC e as subnets.
+      - name: Ler os parametros do SSM
+        run: |
+          aws ssm get-parameters-by-path \
+            --path /garageos --recursive \
+            --query 'Parameters[].Name' --output table
