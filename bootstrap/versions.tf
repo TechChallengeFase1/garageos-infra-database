@@ -8,24 +8,22 @@ terraform {
     }
   }
 
-  # ATENCAO - ovo e galinha do state remoto.
+  # State remoto no bucket criado por esta mesma raiz (ver s3-state.tf).
   #
-  # Este bloco fica comentado no PRIMEIRO apply, porque o bucket que ele
-  # referencia ainda nao existe - e quem cria o bucket e este mesmo Terraform.
+  # Ovo e galinha: no PRIMEIRO apply este bloco ficou comentado, porque o bucket
+  # que ele referencia ainda nao existia. Criado o bucket, o bloco foi
+  # descomentado e o state local migrado com `terraform init -migrate-state`.
   #
-  # Depois do primeiro `terraform apply`:
-  #   1. descomente o bloco abaixo;
-  #   2. troque <ACCOUNT_ID> pelo numero da conta (veja o output state_bucket);
-  #   3. rode `terraform init -migrate-state` e responda "yes";
-  #   4. apague o terraform.tfstate local.
-  #
-  # backend "s3" {
-  #   bucket       = "garageos-tfstate-<ACCOUNT_ID>"
-  #   key          = "bootstrap/terraform.tfstate"
-  #   region       = "us-east-1"
-  #   encrypt      = true
-  #   use_lockfile = true
-  # }
+  # O nome do bucket esta escrito a mao de proposito: blocos backend nao aceitam
+  # variaveis nem interpolacao - sao lidos antes de o Terraform avaliar
+  # qualquer expressao.
+  backend "s3" {
+    bucket       = "garageos-tfstate-266380777968"
+    key          = "bootstrap/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
