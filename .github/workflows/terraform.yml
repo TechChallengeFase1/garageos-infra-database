@@ -1,0 +1,153 @@
+name: Terraform
+
+# Estrategia de deploy do projeto:
+#
+#   feature/x --PR--> homolog --PR--> main
+#                   (homologacao)   (producao)
+#
+#   Pull Request  -> fmt + validate + plan. Nunca aplica.
+#   push homolog  -> apply no workspace "homolog"
+#   push main     -> apply no workspace "producao"
+#
+# Autenticacao por OIDC. Nenhuma credencial estatica da AWS existe neste
+# repositorio - nem em secrets, nem em variaveis.
+
+on:
+  pull_request:
+    branches: [homolog, main]
+  push:
+    branches: [homolog, main]
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: Ambiente alvo
+        required: true
+        type: choice
+        options: [homolog, producao]
+      acao:
+        description: "plan (seguro) ou destroy (apaga o banco do ambiente)"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, destroy]
+
+# Sem esta permissao o GitHub nao emite o token OIDC, e o erro resultante nao
+# menciona permissao nenhuma - e a causa mais dificil de diagnosticar.
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE: arn:aws:iam::266380777968:role/garageos-github-actions
+  TF_VERSION: 1.15.7
+
+# Dois applies simultareos no mesmo workspace corromperiam o state. O lock do
+# S3 ja protegeria, mas falhando - aqui a segunda execucao espera em vez de
+# quebrar.
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: ${{ github.event_name == 'pull_request' && 'Validar' || 'Aplicar' }}
+    runs-on: ubuntu-latest
+
+    # Environments do GitHub. Em "producao" e possivel exigir aprovacao manual
+    # em Settings > Environments > producao > Required reviewers.
+    environment: ${{ github.event_name == 'pull_request' && 'validacao' || (github.ref_name == 'main' && 'producao' || 'homolog') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Definir ambiente alvo
+        id: ctx
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env=${{ inputs.ambiente }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.base_ref }}" = "main" ]; then
+            echo "env=producao" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=homolog" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Autenticar na AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE }}
+          role-session-name: tf-database-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # ── Validacao ───────────────────────────────────────────────────────────
+
+      - name: Formatacao
+        run: terraform fmt -check -recursive -diff
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Validate
+        run: terraform validate -no-color
+
+      - name: Selecionar workspace
+        run: terraform workspace select -or-create "${{ steps.ctx.outputs.env }}"
+
+      # ── Plan ────────────────────────────────────────────────────────────────
+
+      - name: Plan
+        if: inputs.acao != 'destroy'
+        run: |
+          terraform plan -input=false -no-color \
+            -var-file="${{ steps.ctx.outputs.env }}.tfvars" \
+            -out=tfplan
+
+      - name: Resumo do plano
+        if: inputs.acao != 'destroy'
+        run: |
+          {
+            echo "### Terraform — ${{ steps.ctx.outputs.env }}"
+            echo '```'
+            terraform show -no-color tfplan | tail -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Apply ───────────────────────────────────────────────────────────────
+      # So em push para homolog/main. Pull request nunca aplica.
+      #
+      # O RDS leva ~10 minutos na primeira criacao. A execucao parece travada no
+      # passo abaixo; e o comportamento normal.
+
+      - name: Apply
+        if: github.event_name == 'push'
+        run: terraform apply -input=false -auto-approve tfplan
+
+      # ── Destroy manual ──────────────────────────────────────────────────────
+      # Existe para controlar custo sem precisar de Terraform na maquina local.
+
+      - name: Destroy
+        if: github.event_name == 'workflow_dispatch' && inputs.acao == 'destroy'
+        run: |
+          terraform destroy -input=false -auto-approve \
+            -var-file="${{ steps.ctx.outputs.env }}.tfvars"
+
+      - name: Endpoint publicado
+        if: github.event_name == 'push'
+        run: |
+          {
+            echo "### Banco provisionado — ${{ steps.ctx.outputs.env }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Endpoint | \`$(terraform output -raw rds_endpoint)\` |"
+            echo "| SG de cliente | \`$(terraform output -raw rds_client_security_group_id)\` |"
+            echo "| Segredo | \`$(terraform output -raw secret_arn)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

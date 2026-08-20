@@ -6,6 +6,9 @@
 *.tfvars
 !example.tfvars
 
+*.tfstate
+*.tfstate.*
+
 # Planos salvos (podem conter valores sensiveis em texto puro)
 *.tfplan
 
