@@ -121,8 +121,25 @@ data "aws_iam_policy_document" "service_roles" {
       "iam:GetRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
+      "iam:ListRoleTags",
       "iam:CreateServiceLinkedRole",
       "iam:UpdateAssumeRolePolicy",
+
+      # Instance profiles. Necessario mesmo sem usa-los diretamente: ao APAGAR
+      # uma role, o provider da AWS primeiro consulta se ha instance profile
+      # anexado a ela. Sem ListInstanceProfilesForRole, o destroy falha com
+      # AccessDenied depois de ja ter destruido o cluster - deixando as roles
+      # orfas no state.
+      #
+      # As demais acoes da familia entram junto para nao repetir a mesma ida e
+      # volta quando algum recurso realmente precisar de instance profile.
+      "iam:ListInstanceProfilesForRole",
+      "iam:GetInstanceProfile",
+      "iam:CreateInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile",
     ]
     resources = ["*"]
   }
