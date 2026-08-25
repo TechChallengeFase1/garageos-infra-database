@@ -6,6 +6,11 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    # Usado em app-secrets.tf para sortear a JWT_SECRET_KEY e a senha de admin.
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # State remoto no bucket criado por esta mesma raiz (ver s3-state.tf).
