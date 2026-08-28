@@ -50,6 +50,10 @@ resource "aws_secretsmanager_secret_version" "app" {
     jwtSecretKey  = random_password.jwt_secret.result
     adminPassword = random_password.admin_password.result
 
+    # Lida pela pipeline do garageos-app, que a coloca no Secret do Kubernetes,
+    # e pelo Helm do nri-bundle no repositorio do cluster.
+    newRelicLicenseKey = var.newrelic_license_key
+
     # Nao sao segredo, mas viajam junto para que a Lambda e a API leiam issuer
     # e audience da MESMA fonte. Divergencia aqui quebra a validacao do token
     # do mesmo jeito que uma chave diferente.
@@ -65,4 +69,30 @@ resource "aws_ssm_parameter" "app_secret_arn" {
   description = "ARN do segredo com JWT e credenciais de admin da aplicacao"
   type        = "String"
   value       = aws_secretsmanager_secret.app.arn
+}
+
+# ─── License key do New Relic ────────────────────────────────────────────────
+#
+# Diferente da JWT e da senha de admin, esta NAO pode ser sorteada: e emitida
+# pela New Relic e identifica a conta para onde os dados vao. Entra como
+# variavel, e o valor real nunca e versionado.
+#
+# Guardada no MESMO segredo dos outros para que exista um unico lugar de onde a
+# pipeline le tudo que a aplicacao precisa.
+
+variable "newrelic_license_key" {
+  description = <<-EOT
+    License key de ingestao do New Relic (40 caracteres, termina em NRAL).
+    Obtida em one.newrelic.com > Administration > API keys, linha
+    "INGEST - LICENSE", opcao "Copy key" (o VALOR, nao o "Copy key ID").
+
+    Passada no apply:
+      terraform apply -var="newrelic_license_key=..."
+
+    Deixar vazio desabilita o envio: o agente sobe, nao encontra a chave e se
+    desliga sozinho, sem derrubar a aplicacao.
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
 }
