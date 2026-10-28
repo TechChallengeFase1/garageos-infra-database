@@ -11,7 +11,7 @@ variable "project" {
 }
 
 variable "github_org" {
-  description = "Organizacao do GitHub dona dos 4 repositorios"
+  description = "Organizacao do GitHub dona dos repositorios do GarageOS"
   type        = string
   default     = "TechChallengeFase1"
 }
@@ -28,6 +28,13 @@ variable "github_repos" {
     "garageos-infra-database",
     "garageos-infra-k8s",
     "garageos-lambda-auth",
+
+    # Fase 4 - um repositorio por microsservico (ADR 0004 do garageos-app).
+    # O garageos-app continua na lista enquanto e renomeado para
+    # garageos-os-service; sai quando o nome antigo deixar de ser usado.
+    "garageos-os-service",
+    "garageos-billing-service",
+    "garageos-execucao-service",
   ]
 }
 
