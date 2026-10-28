@@ -89,10 +89,16 @@ variable "newrelic_license_key" {
     Passada no apply:
       terraform apply -var="newrelic_license_key=..."
 
-    Deixar vazio desabilita o envio: o agente sobe, nao encontra a chave e se
-    desliga sozinho, sem derrubar a aplicacao.
+    OBRIGATORIA em todo apply. Ela vive no mesmo segredo da JWT e da senha
+    de admin, entao um apply sem ela regravaria o segredo com a chave vazia -
+    sem erro nenhum - e o proximo deploy faria o New Relic parar de reportar
+    em silencio. Por isso nao ha default e o valor vazio e recusado.
   EOT
   type        = string
-  default     = ""
   sensitive   = true
+
+  validation {
+    condition     = length(var.newrelic_license_key) > 0
+    error_message = "Passe a license key do New Relic: terraform apply -var=\"newrelic_license_key=...\". Sem ela, o apply apagaria a chave guardada no segredo garageos/app/secrets."
+  }
 }
