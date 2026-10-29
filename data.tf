@@ -13,13 +13,11 @@ data "aws_ssm_parameter" "vpc_id" {
   name = "/${var.project}/vpc/id"
 }
 
-data "aws_ssm_parameter" "private_subnet_ids" {
-  name = "/${var.project}/vpc/private-subnet-ids"
+data "aws_ssm_parameter" "vpc_cidr" {
+  name = "/${var.project}/vpc/cidr"
 }
 
 locals {
-  vpc_id = data.aws_ssm_parameter.vpc_id.value
-
-  # Parametros do tipo StringList voltam como uma string separada por virgula.
-  private_subnet_ids = split(",", data.aws_ssm_parameter.private_subnet_ids.value)
+  vpc_id   = data.aws_ssm_parameter.vpc_id.value
+  vpc_cidr = data.aws_ssm_parameter.vpc_cidr.value
 }
