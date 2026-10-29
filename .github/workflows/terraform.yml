@@ -38,7 +38,7 @@ on:
         type: choice
         options: [homolog, producao]
       acao:
-        description: "plan (so mostra) | apply (cria) | destroy (apaga o banco e os dados)"
+        description: "plan (so mostra) | apply (cria) | destroy (apaga o cracha rds-client)"
         required: true
         default: plan
         type: choice
@@ -75,7 +75,7 @@ jobs:
 
     # O environment `producao` e onde se configura required reviewers
     # (Settings > Environments). Especialmente importante aqui: um destroy
-    # neste repositorio apaga o banco E os dados.
+    # neste repositorio apaga o cracha usado pelos nos e pelos bancos.
     environment: ${{ github.event_name == 'pull_request' && 'validacao' || (github.ref_name == 'main' && 'producao' || 'homolog') }}
 
     steps:
@@ -151,30 +151,22 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ── Apply ───────────────────────────────────────────────────────────────
-      # O RDS leva ~10 minutos na primeira criacao. A execucao parece travada
-      # neste passo; e o comportamento normal.
 
       - name: Apply
         if: steps.ctx.outputs.aplicar == 'true'
         run: terraform apply -input=false -auto-approve tfplan
 
-      - name: Endpoint publicado
+      - name: Cracha publicado
         if: steps.ctx.outputs.aplicar == 'true'
         run: |
           {
-            echo "### Banco provisionado — ${{ steps.ctx.outputs.env }}"
+            echo "### Cracha rds-client — ${{ steps.ctx.outputs.env }}"
             echo ""
-            echo "| | |"
-            echo "|---|---|"
-            echo "| Endpoint | \`$(terraform output -raw rds_endpoint)\` |"
-            echo "| SG de cliente | \`$(terraform output -raw rds_client_security_group_id)\` |"
-            echo "| Segredo | \`$(terraform output -raw secret_arn)\` |"
+            echo "SG de cliente: \`$(terraform output -raw rds_client_security_group_id)\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ── Destroy manual ──────────────────────────────────────────────────────
-      # ATENCAO: aqui o destroy apaga o banco e todos os dados. O
-      # skip_final_snapshot esta ligado (ambiente descartavel), entao nao ha
-      # snapshot de recuperacao.
+      # Destrua por ultimo: o cluster e os bancos dos servicos usam o cracha.
 
       - name: Destroy
         if: github.event_name == 'workflow_dispatch' && inputs.acao == 'destroy'

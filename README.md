@@ -4,6 +4,8 @@ Infraestrutura de dados do **GarageOS**: o banco gerenciado (Amazon RDS PostgreS
 
 > Um dos quatro repositórios do Tech Challenge — Fase 3. É o **primeiro** a ser aplicado.
 
+> **Fase 4:** o RDS do monólito saiu deste repositório. Cada microsserviço provisiona o próprio banco na pasta `infra/` do seu repositório (ADR 0004 do `garageos-app`), publicando os ponteiros em `/garageos/<env>/services/<serviço>/*`. Aqui ficou apenas o crachá `rds-client`, que os nós do EKS carregam e que o SG do banco de cada serviço aceita. O plano gratuito da conta permite no máximo 2 instâncias RDS, exatamente as do OS e do Execução. O diagrama abaixo descreve a Fase 3.
+
 ---
 
 ## O que este repositório provisiona
